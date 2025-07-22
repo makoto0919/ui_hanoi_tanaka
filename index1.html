@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ハノイの塔</title>
+<style>
+    body { font-family: sans-serif; text-align: center; background: #f0f0f0; }
+    #start-screen, #game-screen { display: none; }
+    #start-screen.active, #game-screen.active { display: block; }
+  #controls { margin-top: 20px; display: flex; justify-content: center; gap: 20px; align-items: center; flex-wrap: wrap; }
+  #game { display: flex; justify-content: center; gap: 2vw; margin-top: 20px; flex-wrap: nowrap; overflow-x: auto; }
+  .tower {
+   width: 300px;
+   height: 300px;
+   background: #ddd;
+   position: relative;
+   border-radius: 10px;
+   display: flex;
+   flex-direction: column-reverse;
+   align-items: center;
+   padding: 10px;
+   box-sizing: border-box;
+   overflow: hidden;
+   /* スクロール対応 */
+    overflow-y: auto;             /* 縦スクロール可能にする */
+    overflow-x: hidden;           /* 横スクロールは隠す */
+  }
+  .disk {
+   max-width: 100%;
+   box-sizing: border-box;
+   display: block;
+   height: 24px;
+   margin: 3px 0;
+   border-radius: 6px;
+   cursor: grab;
+   border: 2px solid rgba(0,0,0,0.3);
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.3),
+                0 3px 6px rgba(0,0,0,0.4);
+  }
+  #history-container { margin-top: 20px; display: none !important; }
+  #history-container.show { display: block !important; }
+  #history-log { max-height: 150px; overflow-y: auto; background: #fff; padding: 10px; border: 1px solid #aaa; text-align: left; width: 300px; margin: 0 auto; }
+  #toggle-history-under { margin-top: 20px; }
+  .disk.clickable {
+   cursor: pointer;
+  }
+  /* キーボード操作ガイドのスタイル */
+#keyboard-guide {
+  font-size: 0.9em;
+  color: #555;
+  background-color: #e0e0e0;
+  padding: 8px 15px;
+  border-radius: 5px;
+  margin-bottom: 15px; /* 他の要素との間にスペース */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px; /* キーと機能の間のスペース */
+}
+
+#keyboard-guide span {
+  font-weight: bold;
+  color: #333;
+}
+
+#victory-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 2px solid #888;
+  border-radius: 12px;
+  padding: 20px 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  display: none;
+  text-align: center;
+}
+#victory-popup h2 {
+  margin-bottom: 20px;
+}
+#victory-popup button {
+  margin: 5px 10px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+select, button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  margin: 5px 0;
+}
+
+.tower-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tower-label {
+  margin-top: 8px;
+  font-size: 1em;
+  color: #333;
+}
+
+#rule-section {
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 15px 20px;
+  margin-top: 20px;
+  border-radius: 10px;
+  text-align: left;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#rule-section h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+#rule-section ul {
+  list-style-type: disc;
+  padding-left: 20px;
+}
+
+#rule-image {
+  display: block;
+  margin: 20px auto 0;
+  max-width: 60%;
+  height: auto;
+}
+
+#hint-popup {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.hint-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.hint-content button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  font-size: 1em;
+  border: none;
+  border-radius: 8px;
+  background-color: #4CAF50;
+  color: white;
+  cursor: pointer;
+}
+.hint-content button:hover {
+  background-color: #45a049;
+}
+.tower.highlight {
+  outline: 4px solid #4CAF50;
+  box-shadow: 0 0 10px #4CAF50;
+}
+
+
+
+
+
+ </style>
+</head>
+<body tabindex="0">
+ <div id="start-screen" class="active">
+  <h1>ハノイの塔 メインページ</h1>
+  <p>円盤の数を選んでください（3〜20）：
+  <select id="disk-select">
+   <option value="3" selected>3</option>
+   <option value="4">4</option>
+   <option value="5">5</option>
+   <option value="6">6</option>
+   <option value="7">7</option>
+   <option value="8">8</option>
+  <option value="9">9</option>
+   <option value="10">10</option>
+   <option value="11">11</option>
+   <option value="12">12</option>
+   <option value="13">13</option>
+   <option value="14">14</option>
+   <option value="15">15</option>
+   <option value="16">16</option>
+   <option value="17">17</option>
+   <option value="18">18</option>
+   <option value="19">19</option>
+   <option value="20">20</option>
+  </select></p>
+  <p>円盤に柄をつけますか？
+  <select id="pattern-select">
+   <option value="off">柄なし</option>
+   <option value="on">柄あり</option>
+   <option value="number" selected>数字付き</option>
+  </select></p>
+  <p>選択中の円盤を移動できる塔にガイドを表示しますか？
+  <select id="highlight-toggle">
+    <option value="on" selected>はい</option>
+    <option value="off">いいえ</option>
+  </select>
+  </p>
+  <p><strong>操作方法を選んでください</strong>：
+  <select id="mode-select">
+   <option value="drag">ドラッグ＆ドロップのみ</option>
+   <option value="click">クリック移動のみ</option>
+   <option value="keyboard" selected>ボタン操作のみ</option>
+   <!--<option value="natural">自然言語操作モード</option>
+   <option value="voice">音声操作モード</option>-->
+  </select></p>
+<!-- モードごとの説明を追加 -->
+
+  <button id="start-btn">ゲームスタート！</button>
+  <div id="rule-section">
+    <h2>🎮 操作モードの説明</h2>
+  <ul>
+    <li><strong>ドラッグ＆ドロップのみ：</strong> 円盤をマウスでつかんで塔に移動します</li>
+    <li><strong>クリック移動のみ：</strong> 円盤をクリック→移動先の塔をクリックで操作します</li>
+    <li><strong>ボタン操作のみ：</strong> 数字キー（1〜3）で塔を選択、Rでリセット、Zで1手戻す など</li>
+    <!--<li><strong>自然言語操作モード：</strong> 「左から右へ動かして」などとテキストで指示できます</li>
+    <li><strong>音声操作モード：</strong> マイクで指示できます（例：「中央の塔から右へ移動」）</li>
+    <li><strong>ジェスチャーモード：</strong> トラックパッド上のジェスチャーで指示できます</li>-->
+  </ul>
+  <h2>🧩 ゲームのルール 🧩</h2>
+  <p>「ハノイの塔」は，すべての円盤を左の塔から右の塔に移動させるパズルです。</p>
+  <ul>
+    <li>一度に動かせるのは塔の一番上にある1枚の円盤だけ</li>
+    <li>円盤の上にその円盤よりも大きな円盤を置くことはできない</li>
+    <li>3つの塔の間で移動させる</li>
+  </ul>
+  <p>最小手数でのクリアを目指しましょう！</p>
+  <img src="/Users/tanakamakoto/Library/CloudStorage/GoogleDrive-material-0919@g.ecc.u-tokyo.ac.jp/マイドライブ/Uni/4S/UI/public/rule.png" alt="ハノイの塔のルール図解" id="rule-image">
+</div>
+
+ </div>
+
+ <div id="game-screen">
+  <h1>ハノイの塔</h1>
+  <div id="controls">
+  <p id="keyboard-guide" style="display: none;">
+    <span style="font-weight: bold;">[ボタン操作ガイド]</span><br>
+    <span>M</span>キー: メイン画面に戻る &nbsp; <span>R</span>キー: ゲームをリセット &nbsp; <span>Z</span>キー: 一手戻す &nbsp; <span>H</span>キー: 移動履歴の表示/非表示を切り替え<br>
+    <span>1</span>〜<span>3</span>キー: ディスクの選択と移動を行います。「動かす円盤のある塔を選択→移動先の塔を選択」を繰り返します。<br>
+    <span style="font-size: 0.9em; color: #666;">例: <span style="font-weight: bold;">1</span>キーで左の塔のディスクを選択し、<span style="font-weight: bold;">3</span>キーで右の塔へ移動させます。</span>
+  </p>
+  <button id="reset-btn">ゲームをリセット</button>
+  <button id="undo-btn">1手戻す</button>
+  <button id="back-btn">メインページに戻る</button>
+  <button id="rule-btn" style="position:absolute; top:10px; right:10px;">ルール</button>
+
+</div>
+<div id="nlp-controls" style="display: none; margin-top: 10px;">
+  <input id="nlp-input" type="text" placeholder="例：左から右に動かして" style="width: 60%; padding: 8px; font-size: 1em;">
+  <button id="nlp-submit">送信</button>
+</div>
+<div id="voice-controls" style="display: none; margin-top: 10px;">
+  <button id="voice-start">🎤 音声入力開始</button>
+  <span id="voice-status" style="margin-left: 10px; color: #555;">待機中</span>
+</div>
+
+  <div id="game">
+  <div class="tower-container">
+    <div class="tower" id="tower-0" data-label="左の塔"></div>
+    <div class="tower-label">①左の塔</div>
+  </div>
+  <div class="tower-container">
+    <div class="tower" id="tower-1" data-label="中央の塔"></div>
+    <div class="tower-label">②中央の塔</div>
+  </div>
+  <div class="tower-container">
+    <div class="tower" id="tower-2" data-label="右の塔"></div>
+    <div class="tower-label">③右の塔</div>
+  </div>
+</div>
+
+  <div id="toggle-history-under">
+    <span>手数: <span id="move-count">0</span></span><br>
+   <button id="toggle-history">＋移動履歴を表示する</button>
+  </div>
+  <div id="history-container">
+   <h3>移動履歴</h3>
+   <div id="history-log"></div>
+  </div>
+ </div>
+ <div id="victory-popup">
+  <h2>🎉 おめでとうございます！全ての円盤を移動できました！ 🎉</h2>
+  <button id="retry-btn">もう一度挑戦する</button>
+  <button id="back-main-btn">メインページに戻る</button>
+  <button id="close-popup-btn">閉じる</button>
+</div>
+<div id="hint-popup" style="display: none;">
+  <div class="hint-content">
+    <h2>💡 初めての方へ</h2>
+    <p>このゲームのルールや操作説明はページ下にあります。<br>まずは3枚の円盤から始めてみましょう！</p>
+    <button id="close-hint-btn">わかった！</button>
+  </div>
+</div>
+<div id="rule-popup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+ background:#fff; border:2px solid #888; border-radius:12px; padding:20px 30px; box-shadow:0 4px 20px rgba(0,0,0,0.3);
+ z-index:9999; text-align:center; max-width:500px;">
+  <h2>ハノイの塔 ルール</h2>
+  <p>• 1回に動かせるのは塔の一番上の1枚の円盤だけです。<br>
+     • 小さい円盤の上に大きい円盤は置けません。<br>
+     • すべての円盤を左から右の塔に移動すればクリアです。</p>
+     <img src="/Users/tanakamakoto/Library/CloudStorage/GoogleDrive-material-0919@g.ecc.u-tokyo.ac.jp/マイドライブ/Uni/4S/UI/public/rule.png" alt="ハノイの塔のルール図解" id="rule-image">
+  <button id="close-rule-btn">閉じる</button>
+</div>
+
+
+
+ <script>
+// 効果音オブジェクト
+const sounds = {
+  move: new Audio('sounds/move.mp3'),
+  invalid: new Audio('sounds/invalid.mp3'),
+  victory: new Audio('sounds/victory.mp3')
+};
+
+const moveSounds = {
+    1: new Audio('sounds/move_Pitch_Changer.mp3'),
+    2: new Audio('sounds/move_Pitch_Changer-2.mp3'),
+    3: new Audio('sounds/move_Pitch_Changer-3.mp3'),
+    4: new Audio('sounds/move_Pitch_Changer-4.mp3'),
+    5: new Audio('sounds/move_Pitch_Changer-5.mp3'),
+    6: new Audio('sounds/move_Pitch_Changer-6.mp3'),
+    7: new Audio('sounds/move_Pitch_Changer-7.mp3'),
+    8: new Audio('sounds/move_Pitch_Changer-8.mp3'),
+    9: new Audio('sounds/move_Pitch_Changer-9.mp3'),
+    10: new Audio('sounds/move_Pitch_Changer-10.mp3'),
+    11: new Audio('sounds/move_Pitch_Changer-11.mp3'),
+    12: new Audio('sounds/move_Pitch_Changer-12.mp3'),
+    13: new Audio('sounds/move_Pitch_Changer-13.mp3'),
+    14: new Audio('sounds/move_Pitch_Changer-14.mp3'),
+    15: new Audio('sounds/move_Pitch_Changer-15.mp3'),
+    16: new Audio('sounds/move_Pitch_Changer-16.mp3'),
+    17: new Audio('sounds/move_Pitch_Changer-17.mp3'),
+    18: new Audio('sounds/move_Pitch_Changer-18.mp3'),
+    19: new Audio('sounds/move_Pitch_Changer-19.mp3'),
+    20: new Audio('sounds/move_Pitch_Changer-20.mp3')    
+}
+
+let moveCount = 0;
+let previousMoves = [];
+let selectedDisk = null; // クリックモードで選択されたディスクを保持
+let sourceTower = null; // クリックモードで選択されたディスクの元となる塔を保持
+let currentMode = 'drag'; // 現在の操作モードを保持
+let highlightEnabled = true;  // 初期値はオン
+
+
+// 初期セットアップ
+document.addEventListener('DOMContentLoaded', () => {
+    const startButton = document.getElementById('start-btn');
+    const startScreen = document.getElementById('start-screen');
+    const gameScreen = document.getElementById('game-screen');
+    const diskSelect = document.getElementById('disk-select');
+    const patternSelect = document.getElementById('pattern-select');
+    const modeSelect = document.getElementById('mode-select');
+    const resetButton = document.getElementById('reset-btn');
+    const undoButton = document.getElementById('undo-btn');
+    const backButton = document.getElementById('back-btn');
+    const toggleHistoryButton = document.getElementById('toggle-history');
+    const historyContainer = document.getElementById('history-container');
+    const highlightSelect = document.getElementById('highlight-toggle');
+
+    const ruleBtn = document.getElementById('rule-btn');
+    const rulePopup = document.getElementById('rule-popup');
+    const closeRuleBtn = document.getElementById('close-rule-btn');
+
+    ruleBtn.addEventListener('click', () => {
+        rulePopup.style.display = 'block';
+    });
+
+    closeRuleBtn.addEventListener('click', () => {
+        rulePopup.style.display = 'none';
+    });
+
+    const controls = document.getElementById('controls');
+    const timerDiv = document.createElement('div');
+    timerDiv.id = 'timer-display';
+    timerDiv.style.marginLeft = '20px';
+    timerDiv.style.fontWeight = 'bold';
+    timerDiv.style.color = '#333';
+    timerDiv.textContent = '経過時間: 0:00';
+    controls.appendChild(timerDiv);
+
+
+
+    // ゲーム開始ボタンのイベントリスナー
+    startButton.addEventListener('click', () => {
+        highlightEnabled = (highlightSelect.value === 'on');
+        const numDisks = parseInt(diskSelect.value);
+        const pattern = patternSelect.value;
+        currentMode = modeSelect.value; // モードを設定
+
+        // 初回無音再生でブラウザ制限を解除する
+        Object.values(sounds).forEach(audio => {
+            audio.volume = 0;
+            audio.play().catch(() => {});
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = 1;
+        });
+
+        // キーボードモード専用表示切り替え
+        const keyboardGuide = document.getElementById('keyboard-guide');
+        if (currentMode === 'keyboard') {
+            keyboardGuide.style.display = 'block';
+            resetButton.style.display = 'none';
+            undoButton.style.display = 'none';
+            backButton.style.display = 'none';
+        } else {
+            keyboardGuide.style.display = 'none';
+            resetButton.style.display = 'inline-block';
+            undoButton.style.display = 'inline-block';
+            backButton.style.display = 'inline-block';
+        }
+
+        startScreen.classList.remove('active');
+        gameScreen.classList.add('active');
+
+        initializeGame(numDisks, pattern, currentMode); // 初期化時にモードを渡す
+
+        // 履歴と手数カウンターをリセット
+        document.getElementById('history-log').innerHTML = '';
+        moveCount = 0;
+        document.getElementById('move-count').textContent = moveCount;
+        previousMoves = [];
+
+        const nlpControls = document.getElementById('nlp-controls');
+        nlpControls.style.display = (currentMode === 'natural') ? 'block' : 'none';
+
+        startTimer();
+    });
+
+    // ゲームリセットボタンのイベントリスナー
+    resetButton.addEventListener('click', () => {
+        const threshold = 10; // ポップアップを出す基準手数
+        if (moveCount >= threshold) {
+            const confirmReset = confirm("ゲームをリセットして最初からやり直しますか？");
+            if (!confirmReset) {
+                return; // キャンセルされた場合は処理中断
+            }
+        }
+        const numDisks = parseInt(diskSelect.value);
+        const pattern = patternSelect.value;
+        // currentMode を使用して、リセット時も現在のモード設定を維持
+        initializeGame(numDisks, pattern, currentMode);
+        moveCount = 0;
+        document.getElementById('move-count').textContent = moveCount;
+        previousMoves = [];
+        document.getElementById('history-log').innerHTML = '';
+        selectedDisk = null; // リセット時に選択中のディスクを解除
+        sourceTower = null;
+        clearTowerHighlights();
+        startTimer();
+    });
+
+    // 1手戻すボタンのイベントリスナー
+    undoButton.addEventListener('click', () => {
+        const lastMove = previousMoves.pop();
+        if (!lastMove) return; // 戻す手がない場合は何もしない
+
+        const [fromId, toId, diskSize] = lastMove;
+        const fromTower = document.getElementById(fromId);
+        const toTower = document.getElementById(toId);
+
+        // 移動したディスクを特定して元の塔に戻す
+        const diskToMoveBack = Array.from(toTower.children).find(disk => disk.dataset.size == diskSize);
+        if (diskToMoveBack) {
+            fromTower.appendChild(diskToMoveBack);
+            moveCount = Math.max(0, moveCount - 1); // 手数を減らす
+            document.getElementById('move-count').textContent = moveCount;
+
+            // 履歴ログから最新のエントリを削除
+            const historyLog = document.getElementById('history-log');
+            historyLog.lastChild?.remove();
+        } else {
+            // ディスクが見つからない場合は、移動履歴を元に戻す（エラーハンドリング）
+            previousMoves.push(lastMove);
+            console.error('元に戻すディスクが見つかりませんでした。');
+        }
+
+        // 現在のモードに基づいて、ディスクの操作可能状態を更新
+        if (currentMode === 'drag') {
+            updateDraggableDisks();
+        } else if (currentMode === 'click') {
+            selectedDisk?.classList.remove('dragging', 'clickable');
+            selectedDisk = null;
+            sourceTower = null;
+            updateClickableDisks(); // クリックモードの場合は、クリック可能状態を更新
+        } else if (currentMode === 'keyboard') {
+            selectedDisk?.classList.remove('dragging', 'clickable');
+            selectedDisk = null;
+            sourceTower = null;
+        }
+    });
+
+    // メインページに戻るボタンのイベントリスナー
+    backButton.addEventListener('click', () => {
+        document.body.focus();
+        // メインページに戻る際に、ボタンを再表示
+        document.getElementById('keyboard-guide').style.display = 'none';
+        document.getElementById('reset-btn').style.display = 'inline-block';
+        document.getElementById('undo-btn').style.display = 'inline-block';
+        document.getElementById('back-btn').style.display = 'inline-block';
+
+        document.getElementById('game-screen').classList.remove('active');
+        document.getElementById('start-screen').classList.add('active');
+        selectedDisk = null; // メインに戻る際に選択中のディスクを解除
+        sourceTower = null;
+        clearTowerHighlights();
+    });
+
+    // 移動履歴表示/非表示ボタンのイベントリスナー
+    toggleHistoryButton.addEventListener('click', () => {
+        historyContainer.classList.toggle('show');
+        toggleHistoryButton.textContent = historyContainer.classList.contains('show') ? '−移動履歴を非表示にする' : '＋移動履歴を表示する';
+    });
+
+    document.getElementById('retry-btn').addEventListener('click', () => {
+        document.getElementById('victory-popup').style.display = 'none';
+        document.getElementById('reset-btn').click();
+    });
+
+    document.getElementById('back-main-btn').addEventListener('click', () => {
+        document.getElementById('victory-popup').style.display = 'none';
+        document.getElementById('back-btn').click();
+    });
+
+    document.getElementById('close-popup-btn').addEventListener('click', () => {
+        document.getElementById('victory-popup').style.display = 'none';
+    });
+
+    // 初回起動時のみヒント表示 コンソールで localStorage.clear() を実行してリセット可能
+    if (!localStorage.getItem('hanoiHintShown')) {
+        const hintPopup = document.getElementById('hint-popup');
+        const closeHintBtn = document.getElementById('close-hint-btn');
+        hintPopup.style.display = 'flex';
+
+        closeHintBtn.addEventListener('click', () => {
+            hintPopup.style.display = 'none';
+            localStorage.setItem('hanoiHintShown', 'true');
+    });
+}
+
+
+});
+
+
+let drawing = false;
+let points = [];
+let gestureState = null;
+let fromTower = null;
+let startTime = null;
+let timerInterval = null;
+
+function playMoveSound(diskSize, maxDisks) {
+    const totalSounds = 20;
+    const center = 13;  // 基準音
+
+    let selectedIndexes = [];
+
+    if (maxDisks === totalSounds) {
+        // 20枚のときは1:1で全ての音を使う
+        selectedIndexes = Array.from({length: totalSounds}, (_, i) => totalSounds - i);
+    } else {
+        // maxDisks枚用に、13を中心にした音を均等に選ぶ
+        // まず20音を「基準13を中心にしたリスト」にソート
+        const ordered = [
+            ...Array.from({length: totalSounds - center}, (_, i) => center + (i + 1)), // 高音側（14〜20）
+            center,
+            ...Array.from({length: center - 1}, (_, i) => center - (i + 1)) // 低音側（12〜1）
+        ];
+
+        // 均等にmaxDisks個を抽出（小さい円盤順に高音側から）
+        for (let i = 0; i < maxDisks; i++) {
+            const idx = Math.floor(i * (ordered.length / maxDisks));
+            selectedIndexes.push(ordered[idx]);
+        }
+
+        // 小さい順に並べ替え（サイズ1が高音）
+        selectedIndexes.sort((a, b) => b - a);
+    }
+
+    // サイズに対応する音を選ぶ（diskSizeは1が最小，maxDisksが最大）
+    const soundIndex = selectedIndexes[diskSize - 1];
+
+    const audio = moveSounds[soundIndex]?.cloneNode();
+    if (audio) {
+        audio.currentTime = 0;
+        audio.play();
+    }
+}
+
+
+// ゲームの初期化関数
+function initializeGame(numDisks, pattern, mode) {
+  const towers = [
+    document.getElementById('tower-0'),
+    document.getElementById('tower-1'),
+    document.getElementById('tower-2')
+  ];
+
+  towers.forEach(tower => tower.innerHTML = '');
+
+  // 高さ計算
+    let baseHeight = 250;
+    let extraHeightPerDisk = 20;
+
+    let adjustedHeight = baseHeight + (numDisks - 3) * extraHeightPerDisk;
+    adjustedHeight = Math.max(adjustedHeight, 300);
+    // adjustedHeight = Math.min(adjustedHeight, 1000);
+
+    
+
+    // 最大ディスク幅計算
+    // const maxDiskWidth = numDisks * 20 + 30;
+    let maxDiskWidth = window.innerWidth/4;
+    if (numDisks < 10) {
+        maxDiskWidth = window.innerWidth/5;
+    }
+    const towerWidth = maxDiskWidth + 40;
+    const minDiskWidth = 60;   // 最小ディスクの幅（例）
+    const step = (maxDiskWidth - minDiskWidth) / (numDisks - 1);
+
+    towers.forEach(tower => {
+        tower.style.height = `${adjustedHeight}px`;
+        tower.style.width = `${towerWidth}px`;
+    });
+
+
+  for (let i = numDisks; i >= 1; i--) {
+    const disk = document.createElement('div');
+    disk.className = 'disk';
+    disk.dataset.size = i;
+    disk.style.width = `${(i-1) * step + minDiskWidth}px`;
+    const accessibleColors = [
+      '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
+      '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
+      '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
+      '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080'
+    ];
+    disk.style.backgroundColor = accessibleColors[(i - 1) % accessibleColors.length];
+
+    if (pattern === 'on') {
+      const angle = (i * 30) % 360; // 円盤のサイズに基づいて角度を変化
+      const gradientStops = [
+        `rgba(0,0,0,0.5) ${5 + (i * 2) % 10}px`,
+        `transparent ${10 + (i * 3) % 15}px`
+      ];
+      disk.style.backgroundImage = `repeating-linear-gradient(
+        ${angle}deg,
+        rgba(0,0,0,0.5),
+        ${gradientStops.join(', ')}
+      )`;
+    } else if (pattern === 'number') {
+      disk.textContent = i; // 数字を表示
+      disk.style.color = '#fff';
+      disk.style.textAlign = 'center';
+      disk.style.fontWeight = 'bold';
+    }
+
+    towers[0].appendChild(disk);
+  }
+
+    if (mode === 'drag') {
+        setupDragAndDrop(towers);
+    } else if (mode === 'click') {
+        setupClickToMove(towers);
+    } else if (mode === 'keyboard') {
+        // キーボードモードの初期化
+    } else if (mode === 'natural') {
+        setupNaturalLanguageMode(towers);
+    }
+    else if (mode === 'voice') {
+        setupVoiceControlMode(towers);
+    }
+}
+
+// ドラッグ＆ドロップモードのセットアップ
+function setupDragAndDrop(towers) {
+
+
+    towers.forEach(tower => {
+        // ドラッグイベントリスナーを一度だけ削除し、再設定する
+        tower.ondragover = null;
+        tower.ondrop = null;
+        tower.onclick = null; // クリックモードのイベントリスナーを削除
+        Array.from(tower.children).forEach(disk => {
+            disk.draggable = false;
+            disk.ondragstart = null;
+            disk.classList.remove('clickable'); // クリックモードのクラスを削除
+        });
+
+        tower.ondragover = e => e.preventDefault(); // ドロップを許可するために必要
+        tower.ondrop = e => {
+            e.preventDefault();
+            const draggedDiskSize = e.dataTransfer.getData('text/plain'); // ドラッグデータからディスクサイズを取得
+            const draggedDisk = document.querySelector(`.disk.dragging[data-size="${draggedDiskSize}"]`); // 正確なドラッグ中のディスクを取得
+            if (!draggedDisk) return; // ドラッグ中のディスクがない場合は何もしない
+
+            const topDisk = tower.lastElementChild;
+
+            // 移動ルールの確認: 移動しようとしているディスクが、ターゲットの塔の最上部のディスクよりも小さいか
+            if (!topDisk || +draggedDisk.dataset.size < +topDisk.dataset.size) {
+                const oldSourceTower = draggedDisk.parentElement; // 古いソース塔
+                tower.appendChild(draggedDisk); // ディスクを新しい塔に移動
+
+                // 移動を記録
+                recordMove(oldSourceTower.id, tower.id, draggedDisk.dataset.size);
+            } else {
+                // 無効な移動の場合
+                sounds.invalid.currentTime = 0;
+                sounds.invalid.play();
+                alert('小さい円盤の上に大きい円盤を移動させることはできません！');
+            }
+            draggedDisk.classList.remove('dragging'); // ドラッグ終了後にクラスを削除
+            updateDraggableDisks(); // ドラッグ可能なディスクの状態を更新
+
+            clearTowerHighlights();
+        };
+    });
+    updateDraggableDisks(); // 初期ドラッグ可能ディスクを設定
+}
+
+// クリックモードのセットアップ
+function setupClickToMove(towers) {
+
+
+    towers.forEach(tower => {
+        // ドラッグイベントリスナーを削除し、クリックイベントリスナーを再設定する
+        tower.ondragover = null;
+        tower.ondrop = null;
+        Array.from(tower.children).forEach(disk => {
+            disk.draggable = false; // ドラッグ不可にする
+            disk.ondragstart = null;
+        });
+
+        tower.onclick = (event) => { // 塔全体のクリックイベントを設定
+            const clickedElement = event.target;
+            // クリックされたのがディスクの場合、または塔自身の場合
+            if (clickedElement.classList.contains('disk') || clickedElement.classList.contains('tower')) {
+                const targetTower = clickedElement.classList.contains('tower') ? clickedElement : clickedElement.parentElement;
+                const clickedDisk = clickedElement.classList.contains('disk') ? clickedElement : null;
+
+                handleDiskClick(targetTower, clickedDisk);
+            }
+        };
+    });
+    updateClickableDisks(); // クリック可能なディスクの状態を初期化
+}
+
+function setupNaturalLanguageMode(towers) {
+
+    // 入力欄と送信ボタンの表示
+    const nlpControls = document.getElementById('nlp-controls');
+    nlpControls.style.display = 'block';
+
+    // フォーカスを自動で入力欄に当てる
+    const input = document.getElementById('nlp-input');
+    input.focus();
+
+    // まだ存在しなければ説明ガイドを追加
+    if (!document.getElementById('nlp-guide')) {
+        const guide = document.createElement('div');
+        guide.id = 'nlp-guide';
+        guide.style.marginTop = '10px';
+        guide.style.fontSize = '0.9em';
+        guide.style.color = '#555';
+        guide.style.background = '#eef';
+        guide.style.padding = '10px';
+        guide.style.borderRadius = '5px';
+        guide.innerHTML = `
+            <strong>自然言語操作例:</strong><br>
+            「左から右に動かして」<br>
+            「中央の塔から右へ」<br>
+            「真ん中のディスクを左に持っていって」<br>
+            「右から中に移動して」など
+        `;
+        document.getElementById('game-screen').insertBefore(guide, document.getElementById('toggle-history-under'));
+    }
+
+    // ドラッグやクリックのイベントを無効化（必要に応じて）
+    towers.forEach(tower => {
+        tower.ondrop = null;
+        tower.ondragover = null;
+        tower.onclick = null;
+        Array.from(tower.children).forEach(disk => {
+            disk.draggable = false;
+            disk.onclick = null;
+            disk.classList.remove('clickable', 'dragging');
+        });
+    });
+}
+
+
+// クリックイベントハンドラー (キーボード操作でも共通使用)
+function handleDiskClick(tower, clickedDisk) {
+    const topDisk = tower.lastElementChild;
+
+    if (!selectedDisk) {
+        // まだディスクが選択されていない場合
+        // clickedDisk が存在し、それが最上部のディスクであるかを確認
+        if (topDisk && clickedDisk && clickedDisk === topDisk) {
+            selectedDisk = topDisk;
+            sourceTower = tower;
+            selectedDisk.classList.add('dragging'); // 選択中の視覚的効果
+            selectedDisk.classList.add('clickable'); // クリック選択状態を示す
+        } else if (clickedDisk && clickedDisk !== topDisk) {
+            sounds.invalid.currentTime = 0;
+            sounds.invalid.play();
+            alert('一番上に置かれている円盤しか動かせません！');
+        } else if (!clickedDisk && tower.children.length > 0 && currentMode === 'keyboard') {
+            // キーボードモードで塔がクリックされたがディスクがクリックされていない場合、最上部を選択
+            // これはキーボード操作での塔選択とディスク選択を兼ねるためのロジックです。
+            selectedDisk = topDisk;
+            sourceTower = tower;
+            selectedDisk.classList.add('dragging', 'clickable');
+        } else if (clickedDisk === null && tower.children.length === 0) {
+            // 塔が空で、ディスクが選択されていない場合（特にキーボード操作で）
+            // 何も選択されない
+        }
+        highlightValidTowers(selectedDisk);
+    } else {
+        // ディスクが既に選択されている場合
+        if (tower === sourceTower) {
+            // 同じ塔をクリックした場合、選択を解除
+            selectedDisk.classList.remove('dragging', 'clickable');
+            selectedDisk = null;
+            sourceTower = null;
+        } else if (!topDisk || +selectedDisk.dataset.size < +topDisk.dataset.size) {
+            // 有効な移動の場合
+            tower.appendChild(selectedDisk); // ディスクを新しい塔に移動
+            recordMove(sourceTower.id, tower.id, selectedDisk.dataset.size); // 移動を記録
+
+            selectedDisk.classList.remove('dragging', 'clickable');
+            selectedDisk = null;
+            sourceTower = null;
+        } else {
+            // 無効な移動（小さいディスクの上に大きいディスクを置こうとした場合）
+            sounds.invalid.currentTime = 0;
+            sounds.invalid.play();
+            alert('小さい円盤の上に大きい円盤を移動させることはできません！');
+            selectedDisk.classList.remove('dragging', 'clickable'); // 選択解除
+            selectedDisk = null;
+            sourceTower = null;
+        }
+        clearTowerHighlights();
+    }
+    if (currentMode === 'click') {
+        updateClickableDisks(); // クリック可能なディスクの状態を更新
+    }
+}
+
+// ドラッグ可能なディスクの状態を更新
+function updateDraggableDisks() {
+    const towers = [
+        document.getElementById('tower-0'),
+        document.getElementById('tower-1'),
+        document.getElementById('tower-2')
+    ];
+    towers.forEach(tower => {
+        // まず全てのディスクをドラッグ不可に設定
+        Array.from(tower.children).forEach(disk => {
+            disk.draggable = false;
+            disk.ondragstart = null;
+        });
+
+        // 最上部のディスクのみドラッグ可能に設定
+        const topDisk = tower.lastElementChild;
+        if (topDisk) {
+            topDisk.draggable = true;
+            topDisk.ondragstart = e => {
+                e.dataTransfer.setData('text/plain', topDisk.dataset.size); // ドラッグデータとしてディスクサイズを設定
+                topDisk.classList.add('dragging'); // ドラッグ中の視覚的効果
+                selectedDisk = topDisk;
+                highlightValidTowers(selectedDisk);
+
+                topDisk.ondragend = () => {
+                    clearTowerHighlights();  // ドラッグ終了時（キャンセル含む）にハイライト消去
+                    selectedDisk = null; // ドラッグ終了時に選択中のディスクを解除
+                };
+            };
+        }
+    });
+}
+
+// クリック可能なディスクの状態を更新
+function updateClickableDisks() {
+    const towers = [
+        document.getElementById('tower-0'),
+        document.getElementById('tower-1'),
+        document.getElementById('tower-2')
+    ];
+    towers.forEach(tower => {
+        Array.from(tower.children).forEach(disk => {
+            disk.classList.remove('clickable'); // 全てのディスクからclickableクラスを削除
+        });
+        const topDisk = tower.lastElementChild;
+        if (topDisk && !selectedDisk) { // 選択中のディスクがない場合のみ、最上部のディスクをクリック可能にする
+            topDisk.classList.add('clickable');
+        }
+    });
+}
+
+function showVictoryMessage() {
+    const victoryMessage = document.createElement('div');
+    victoryMessage.textContent = '🎉 おめでとうございます！全ての円盤を移動できました！ 🎉';
+    victoryMessage.style.position = 'fixed';
+    victoryMessage.style.top = '50%';
+    victoryMessage.style.left = '50%';
+    victoryMessage.style.transform = 'translate(-50%, -50%)';
+    victoryMessage.style.fontSize = '2em';
+    victoryMessage.style.background = 'white';
+    victoryMessage.style.padding = '20px';
+    victoryMessage.style.border = '2px solid #888';
+    victoryMessage.style.borderRadius = '10px';
+    victoryMessage.style.zIndex = '9999';
+    victoryMessage.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)';
+    document.body.appendChild(victoryMessage);
+    setTimeout(() => {
+        document.body.removeChild(victoryMessage);
+    }, 4000);
+}
+
+
+function checkVictory() {
+    const rightTower = document.getElementById('tower-2');
+    const totalDisks = parseInt(document.getElementById('disk-select').value);
+    const disksOnRight = rightTower.querySelectorAll('.disk').length;
+
+    if (disksOnRight === totalDisks) {
+        stopTimer();  // タイマー停止
+        const timeStr = getElapsedTimeString();
+        setTimeout(() => {
+            sounds.victory.currentTime = 0;
+            sounds.victory.play();
+
+            const popup = document.getElementById('victory-popup');
+            popup.style.display = 'block';
+            // 既存の情報をクリアしてから結果を表示
+            const oldResult = popup.querySelector('.result-info');
+            if (oldResult) oldResult.remove();
+
+            const result = document.createElement('p');
+            result.className = 'result-info';
+            result.textContent = `経過時間: ${timeStr} ／ 手数: ${moveCount}`;
+            popup.insertBefore(result, popup.querySelector('button')); 
+        }, 200);
+    }
+}
+
+
+// 移動を記録する共通関数
+function recordMove(fromId, toId, diskSize) {
+    // ディスク要素を再度取得する際、selectedDiskがnullになる可能性があるため、
+    // 引数として渡されたdiskSizeと、それに対応する既存のディスクを探すように変更
+    const disk = document.querySelector(`.disk[data-size="${diskSize}"]`);
+    if (!disk) return; // ディスクが見つからない場合は記録しない
+
+    previousMoves.push([fromId, toId, diskSize]);
+    moveCount++;
+    document.getElementById('move-count').textContent = moveCount;
+
+    const fromLabel = document.getElementById(fromId).dataset.label;
+    const toLabel = document.getElementById(toId).dataset.label;
+
+    const entry = document.createElement('div');
+    const diskClone = disk.cloneNode(true); // ディスクのクローンを作成
+    diskClone.style.margin = '0 5px';
+    diskClone.style.height = '15px';
+    diskClone.style.pointerEvents = 'none'; // クリックできないようにする
+
+    entry.appendChild(diskClone);
+    entry.appendChild(document.createTextNode(` を ${fromLabel} → ${toLabel}`));
+    const historyLog = document.getElementById('history-log');
+    historyLog.appendChild(entry);
+    historyLog.scrollTop = historyLog.scrollHeight; // スクロールバーを一番下へ
+    sounds.move.currentTime = 0;
+    // sounds.move.play();
+    const totalDisks = parseInt(document.getElementById('disk-select').value);
+    playMoveSound(parseInt(diskSize), totalDisks);
+    checkVictory(); // 勝利判定
+}
+
+// キーボードイベントリスナー
+document.addEventListener('keydown', (e) => {
+    // 現在のモードがキーボードでなければ何もしない
+    if (currentMode !== 'keyboard') return;
+
+    if (e.key === 'm' || e.key === 'M') {
+        // メインページに戻る
+        document.getElementById('back-btn').click(); // 既存のボタンクリックイベントをトリガー
+    } else if (e.key === 'r' || e.key === 'R') {
+        // ゲームをリセット
+        document.getElementById('reset-btn').click(); // 既存のボタンクリックイベントをトリガー
+    } else if (e.key === 'z' || e.key === 'Z') {
+        // 1手戻す
+        document.getElementById('undo-btn').click(); // 既存のボタンクリックイベントをトリガー
+    } else if (e.key === 'h' || e.key === 'H') {
+        // 履歴表示を切り替え
+        document.getElementById('toggle-history').click(); // 既存のボタンクリックイベントをトリガー
+    } else if (['1', '2', '3'].includes(e.key)) {
+        const towerIndex = parseInt(e.key) - 1;
+        const tower = document.getElementById(`tower-${towerIndex}`);
+        if (!tower) return; // 塔が存在しない場合は何もしない
+        handleDiskClick(tower, tower.lastElementChild);
+    }
+});
+
+const nlpInput = document.getElementById('nlp-input');
+const nlpSubmit = document.getElementById('nlp-submit');
+
+nlpInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        nlpSubmit.click();
+    }
+});
+
+
+nlpSubmit.addEventListener('click', async () => {
+    const command = nlpInput.value.trim();
+    if (!command) return;
+
+    try {
+        const response = await fetch('/nlp-command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: command })
+        });
+
+        const result = await response.json();
+
+        if (!result.success || !result.command || result.command.from == null || result.command.to == null) {
+            alert("モデルの出力が不明です：" + JSON.stringify(result));
+            return;
+        }
+
+        const { from, to } = result.command;
+
+        const towers = [
+            document.getElementById('tower-0'),
+            document.getElementById('tower-1'),
+            document.getElementById('tower-2')
+        ];
+
+        selectedDisk = null;
+        handleDiskClick(towers[from], towers[from].lastElementChild);
+        handleDiskClick(towers[to], null);
+        nlpInput.value = '';
+    } catch (err) {
+        console.error(err);
+        alert("コマンドの処理に失敗しました。");
+    }
+});
+
+function setupVoiceControlMode(towers) {
+
+    const voiceControls = document.getElementById('voice-controls');
+    voiceControls.style.display = 'block';
+
+    // UI更新
+    if (!document.getElementById('voice-guide')) {
+        const guide = document.createElement('div');
+        guide.id = 'voice-guide';
+        guide.style.marginTop = '10px';
+        guide.style.fontSize = '0.9em';
+        guide.style.color = '#555';
+        guide.style.background = '#eef';
+        guide.style.padding = '10px';
+        guide.style.borderRadius = '5px';
+        guide.innerHTML = `
+            <strong>音声操作例:</strong><br>
+            「左から右へ移動して」<br>
+            「中央の塔から右」<br>
+            「一番上を真ん中へ」など
+        `;
+        document.getElementById('game-screen').insertBefore(guide, document.getElementById('toggle-history-under'));
+    }
+
+    // イベントセットアップ
+    document.getElementById('voice-start').addEventListener('click', () => {
+        const status = document.getElementById('voice-status');
+        status.textContent = '音声認識中...';
+
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'ja-JP';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = async (event) => {
+            const transcript = event.results[0][0].transcript;
+            status.textContent = `認識: 「${transcript}」`;
+
+            try {
+                const response = await fetch('/nlp-command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ input: transcript })
+                });
+                const result = await response.json();
+
+                if (!result.success || result.command.from == null || result.command.to == null) {
+                    alert("モデルの出力が不明です：" + JSON.stringify(result));
+                    return;
+                }
+
+                const { from, to } = result.command;
+                selectedDisk = null;
+                handleDiskClick(towers[from], towers[from].lastElementChild);
+                handleDiskClick(towers[to], null);
+
+            } catch (err) {
+                console.error(err);
+                alert("音声コマンドの処理に失敗しました。");
+            }
+        };
+
+        recognition.onerror = (event) => {
+            status.textContent = 'エラー: ' + event.error;
+        };
+
+        recognition.onend = () => {
+            status.textContent += '（終了）';
+        };
+
+        recognition.start();
+    });
+
+    // 他の操作イベント無効化
+    towers.forEach(tower => {
+        tower.ondrop = null;
+        tower.ondragover = null;
+        tower.onclick = null;
+        Array.from(tower.children).forEach(disk => {
+            disk.draggable = false;
+            disk.onclick = null;
+            disk.classList.remove('clickable', 'dragging');
+        });
+    });
+}
+
+
+function highlightValidTowers(selectedDisk) {
+    if (!highlightEnabled) return;
+
+    const towers = [
+        document.getElementById('tower-0'),
+        document.getElementById('tower-1'),
+        document.getElementById('tower-2')
+    ];
+
+    towers.forEach(tower => {
+        const topDisk = tower.lastElementChild;
+        const topSize = topDisk ? parseInt(topDisk.dataset.size) : Infinity;
+        const selectedSize = parseInt(selectedDisk.dataset.size);
+
+        if (tower !== selectedDisk.parentElement && selectedSize < topSize) {
+            tower.classList.add('highlight'); // 合法な塔だけハイライト
+        } else {
+            tower.classList.remove('highlight');
+        }
+    });
+}
+
+function clearTowerHighlights() {
+    document.querySelectorAll('.tower').forEach(tower => {
+        tower.classList.remove('highlight');
+    });
+}
+
+function startTimer() {
+    startTime = Date.now();
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(updateTimerDisplay, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+function updateTimerDisplay() {
+    if (!startTime) return;
+    const elapsedMs = Date.now() - startTime;
+    const seconds = Math.floor(elapsedMs / 1000) % 60;
+    const minutes = Math.floor(elapsedMs / 60000);
+    const timerElem = document.getElementById('timer-display');
+    if (timerElem) {
+        timerElem.textContent = `経過時間: ${minutes}:${seconds.toString().padStart(2,'0')}`;
+    }
+}
+
+function getElapsedTimeString() {
+    const elapsedMs = Date.now() - startTime;
+    const seconds = Math.floor(elapsedMs / 1000) % 60;
+    const minutes = Math.floor(elapsedMs / 60000);
+    return `${minutes}分${seconds}秒`;
+}
+
+
+
+</script>
